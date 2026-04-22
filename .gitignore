@@ -6,10 +6,6 @@ node_modules/
 .env.local
 .env.production
 
-# Generated runtime files
-radio-state.json
-public/audio/dj-*.mp3
-
 # Build outputs
 .next/
 out/

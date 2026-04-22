@@ -1,0 +1,81 @@
+{
+  "playlist": [
+    {
+      "id": 0,
+      "title": "Rain Taxi Window",
+      "src": "/audio/Rain%20Taxi%20Window.mp3",
+      "duration": 180
+    },
+    {
+      "id": 1,
+      "title": "Sunrise Desk (Extended)",
+      "src": "/audio/Sunrise%20Desk%20Loop2.mp3",
+      "duration": 180
+    },
+    {
+      "id": 2,
+      "title": "Mizuno Village Path",
+      "src": "/audio/Mizuno%20Village%20Path.mp3",
+      "duration": 180
+    },
+    {
+      "id": 3,
+      "title": "First Light",
+      "src": "/audio/First%20Light.mp3",
+      "duration": 180
+    },
+    {
+      "id": 4,
+      "title": "First Light (Reprise)",
+      "src": "/audio/First%20Light2.mp3",
+      "duration": 180
+    },
+    {
+      "id": 5,
+      "title": "First Light Drift",
+      "src": "/audio/First%20Light%20Drift.mp3",
+      "duration": 180
+    },
+    {
+      "id": 6,
+      "title": "Morning Cup",
+      "src": "/audio/Morning%20Cup.mp3",
+      "duration": 180
+    },
+    {
+      "id": 7,
+      "title": "Sunrise Desk Loop",
+      "src": "/audio/Sunrise%20Desk%20Loop.mp3",
+      "duration": 180
+    },
+    {
+      "id": 8,
+      "title": "Taped Afternoon",
+      "src": "/audio/Taped%20Afternoon.mp3",
+      "duration": 180
+    },
+    {
+      "id": 9,
+      "title": "Rain on Glass",
+      "src": "/audio/Rain%20on%20Glass.mp3",
+      "duration": 180
+    },
+    {
+      "id": 10,
+      "title": "Paper Rain Window",
+      "src": "/audio/Paper%20Rain%20Window.mp3",
+      "duration": 180
+    },
+    {
+      "id": 11,
+      "title": "Rice Field Dusk",
+      "src": "/audio/Rice%20Field%20Dusk.mp3",
+      "duration": 180
+    }
+  ],
+  "currentIndex": 0,
+  "songsSinceDJ": 0,
+  "hasStarted": false,
+  "voiceIndex": 0,
+  "isPlayingDJ": false
+}

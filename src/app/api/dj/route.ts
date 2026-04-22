@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { generateChatCompletion, generateSpeech, VOICES } from "@/lib/mistral";
 import { getCurrentBlock, getState, saveState } from "@/lib/playlist";
 import { join } from "path";
+import { mkdirSync, existsSync } from "fs";
 
 const VOICE_LIST = [VOICES.female, VOICES.male];
 const HOST_NAMES = ["Camille", "Hugo"];
+
+// Use /tmp for writable storage on Vercel serverless
+const TMP_DIR = "/tmp/mistral-fm";
 
 export async function POST(request: Request) {
   try {
@@ -29,14 +33,20 @@ export async function POST(request: Request) {
 
     const cleanScript = script.replace(/^["']|["']$/g, "").trim();
     const segmentId = isIntro ? `dj-intro-${Date.now()}` : `dj-${Date.now()}`;
-    const outputPath = join(process.cwd(), "public", "audio", `${segmentId}.mp3`);
+    
+    // Ensure tmp directory exists
+    if (!existsSync(TMP_DIR)) {
+      mkdirSync(TMP_DIR, { recursive: true });
+    }
+    
+    const outputPath = join(TMP_DIR, `${segmentId}.mp3`);
 
     await generateSpeech(cleanScript, voiceId, outputPath);
 
     return NextResponse.json({
       segmentId,
       script: cleanScript,
-      audioSrc: `/audio/${segmentId}.mp3`,
+      audioSrc: `/api/audio?file=${segmentId}.mp3`,
       isIntro,
       voice: hostName,
     });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getState, advanceToNextMusic, markDJPlaying, getUpcoming, getSongsUntilDJ } from "@/lib/playlist";
+import { getState, advanceToNextMusic, getCurrentBlock, markDJPlaying, getUpcoming, getSongsUntilDJ } from "@/lib/playlist";
 
 export async function GET() {
   const state = getState();
@@ -36,7 +36,6 @@ export async function POST(request: Request) {
     state.hasStarted = true;
     state.songsSinceDJ = 0;
     state.isPlayingDJ = true;
-    saveState(state);
     return NextResponse.json({
       isIntro: true,
       isPlayingDJ: true,
@@ -44,7 +43,6 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "dj_complete") {
-    // DJ just finished, advance to next music
     const track = advanceToNextMusic(state);
     return NextResponse.json({
       track,
@@ -55,7 +53,6 @@ export async function POST(request: Request) {
     });
   }
 
-  // Normal advance (music track ended)
   const songsUntilDJ = getSongsUntilDJ(state);
   const isDJDue = songsUntilDJ === 0;
 
@@ -75,10 +72,4 @@ export async function POST(request: Request) {
     upcoming: getUpcoming(state, 3),
     songsUntilDJ: getSongsUntilDJ(state),
   });
-}
-
-function saveState(state: any) {
-  const { writeFileSync } = require("fs");
-  const { join } = require("path");
-  writeFileSync(join(process.cwd(), "radio-state.json"), JSON.stringify(state, null, 2));
 }

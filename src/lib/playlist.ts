@@ -1,8 +1,10 @@
-import { readdirSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { readdirSync, existsSync } from "fs";
 import { join } from "path";
 
 const AUDIO_DIR = join(process.cwd(), "public", "audio");
-const STATE_FILE = join(process.cwd(), "radio-state.json");
+
+// In-memory state for serverless compatibility (Vercel has read-only filesystem)
+let memoryState: RadioState | null = null;
 
 export const MUSIC_ORDER = [
   "Rain Taxi Window.mp3",
@@ -19,7 +21,6 @@ export const MUSIC_ORDER = [
   "Rice Field Dusk.mp3",
 ];
 
-// Rename display titles for tracks with "2" in filename
 export const TITLE_MAP: Record<string, string> = {
   "First Light2": "First Light (Reprise)",
   "Sunrise Desk Loop2": "Sunrise Desk (Extended)",
@@ -57,15 +58,9 @@ function parseTrack(filename: string, index: number): Track {
   };
 }
 
-export function getState(): RadioState {
-  if (existsSync(STATE_FILE)) {
-    try {
-      return JSON.parse(readFileSync(STATE_FILE, "utf-8"));
-    } catch {}
-  }
-
+function createInitialState(): RadioState {
   const files = getMusicFiles();
-  const state: RadioState = {
+  return {
     playlist: files.map((f, i) => parseTrack(f, i)),
     currentIndex: 0,
     songsSinceDJ: 0,
@@ -73,12 +68,17 @@ export function getState(): RadioState {
     voiceIndex: 0,
     isPlayingDJ: false,
   };
-  saveState(state);
-  return state;
+}
+
+export function getState(): RadioState {
+  if (!memoryState) {
+    memoryState = createInitialState();
+  }
+  return memoryState;
 }
 
 export function saveState(state: RadioState) {
-  writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  memoryState = state;
 }
 
 export function startRadio(state: RadioState) {
