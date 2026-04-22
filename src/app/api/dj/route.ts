@@ -1,26 +1,28 @@
 import { NextResponse } from "next/server";
 import { generateChatCompletion, generateSpeech, VOICES } from "@/lib/mistral";
-import { getCurrentBlock, getState, saveState } from "@/lib/playlist";
+import { getCurrentBlock, incrementVoiceIndex, createInitialState } from "@/lib/playlist";
+import type { RadioState } from "@/lib/playlist";
 import { join } from "path";
 import { mkdirSync, existsSync } from "fs";
 
-const VOICE_LIST = [VOICES.female, VOICES.male];
 const HOST_NAMES = ["Camille", "Hugo"];
-
-// Use /tmp for writable storage on Vercel serverless
+const VOICE_LIST = [VOICES.female, VOICES.male];
 const TMP_DIR = "/tmp/mistral-fm";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
+    let state: RadioState = body.state || createInitialState();
     const isIntro = body.type === "intro";
     const block = getCurrentBlock();
-    const state = getState();
+
+    if (!state.playlist || state.playlist.length === 0) {
+      state = createInitialState();
+    }
 
     const voiceId = VOICE_LIST[state.voiceIndex % VOICE_LIST.length];
     const hostName = HOST_NAMES[state.voiceIndex % HOST_NAMES.length];
-    state.voiceIndex++;
-    saveState(state);
+    state = incrementVoiceIndex(state);
 
     const prompt = isIntro
       ? `You are ${hostName}, a charismatic radio host launching MISTRAL-FM. Generate a punchy, exciting 40-45 word station intro (~20 seconds). Welcome listeners with energy, mention Mistral-powered radio. Use exclamation marks and natural enthusiasm. Never say "artificial intelligence" or "AI".`
@@ -33,14 +35,12 @@ export async function POST(request: Request) {
 
     const cleanScript = script.replace(/^["']|["']$/g, "").trim();
     const segmentId = isIntro ? `dj-intro-${Date.now()}` : `dj-${Date.now()}`;
-    
-    // Ensure tmp directory exists
+
     if (!existsSync(TMP_DIR)) {
       mkdirSync(TMP_DIR, { recursive: true });
     }
-    
-    const outputPath = join(TMP_DIR, `${segmentId}.mp3`);
 
+    const outputPath = join(TMP_DIR, `${segmentId}.mp3`);
     await generateSpeech(cleanScript, voiceId, outputPath);
 
     return NextResponse.json({
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       audioSrc: `/api/audio?file=${segmentId}.mp3`,
       isIntro,
       voice: hostName,
+      state,
     });
   } catch (err: any) {
     console.error("DJ generation error:", err);

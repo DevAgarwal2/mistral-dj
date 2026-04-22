@@ -502,7 +502,10 @@ export default function HomePage() {
             <MistralLogo className="w-4 h-4" />
             <span className="font-medium">MISTRAL-FM</span>
           </div>
-          <span>Mistral Small · Voxtral TTS · Next.js</span>
+          <div className="flex items-center gap-3">
+            <span>Mistral Small · Voxtral TTS</span>
+            <a href="https://x.com/noctus91" target="_blank" rel="noopener noreferrer" className="text-[#FF8205] hover:underline font-medium">@noctus91</a>
+          </div>
         </div>
       </footer>
 
