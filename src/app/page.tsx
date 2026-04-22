@@ -486,8 +486,8 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <span>Mistral Small · Voxtral TTS</span>
-            <a href="https://x.com/noctus91" target="_blank" rel="noopener noreferrer" className="text-[#9a9590] hover:text-[#FF8205] transition-colors">
-              <XLogo className="w-4 h-4" />
+            <a href="https://x.com/noctus91" target="_blank" rel="noopener noreferrer" className="text-[#9a9590] hover:text-[#FF8205] transition-colors p-1.5 rounded-full hover:bg-amber-50">
+              <XLogo className="w-6 h-6" />
             </a>
           </div>
         </div>
