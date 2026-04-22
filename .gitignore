@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Generated runtime files
+radio-state.json
+public/audio/dj-*.mp3
+
+# Build outputs
+.next/
+out/
+dist/
+
+# OS files
+.DS_Store
+*.log
