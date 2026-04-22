@@ -11,6 +11,10 @@ node_modules/
 out/
 dist/
 
+# Generated runtime files
+radio-state.json
+public/audio/dj-*.mp3
+
 # OS files
 .DS_Store
 *.log
