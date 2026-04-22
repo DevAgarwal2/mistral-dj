@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, SkipForward, Volume2, Radio, Music, Headphones, Mic } from "lucide-react";
+import { Play, Pause, SkipForward, Volume2, Radio, Music, Mic } from "lucide-react";
 
 interface Track {
-  id: number;
   title: string;
   src: string;
-  duration: number;
-  isDJ?: boolean;
 }
 
 interface Block {
@@ -19,6 +16,24 @@ interface Block {
   mood: string;
   host: string;
 }
+
+// Static playlist — same order as server
+const PLAYLIST: Track[] = [
+  { title: "Rain Taxi Window", src: "/audio/Rain%20Taxi%20Window.mp3" },
+  { title: "Sunrise Desk (Extended)", src: "/audio/Sunrise%20Desk%20Loop2.mp3" },
+  { title: "Mizuno Village Path", src: "/audio/Mizuno%20Village%20Path.mp3" },
+  { title: "First Light", src: "/audio/First%20Light.mp3" },
+  { title: "First Light (Reprise)", src: "/audio/First%20Light2.mp3" },
+  { title: "First Light Drift", src: "/audio/First%20Light%20Drift.mp3" },
+  { title: "Morning Cup", src: "/audio/Morning%20Cup.mp3" },
+  { title: "Sunrise Desk Loop", src: "/audio/Sunrise%20Desk%20Loop.mp3" },
+  { title: "Taped Afternoon", src: "/audio/Taped%20Afternoon.mp3" },
+  { title: "Rain on Glass", src: "/audio/Rain%20on%20Glass.mp3" },
+  { title: "Paper Rain Window", src: "/audio/Paper%20Rain%20Window.mp3" },
+  { title: "Rice Field Dusk", src: "/audio/Rice%20Field%20Dusk.mp3" },
+];
+
+const HOSTS = ["Camille", "Hugo"];
 
 function MistralLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
@@ -33,6 +48,14 @@ function MistralLogo({ className = "w-8 h-8" }: { className?: string }) {
       <path d="M162.984 81.2593H135.815V108.349H162.984V81.2593Z" fill="#FA500F"/>
       <path d="M81.4879 108.339H-0.00146484V135.429H81.4879V108.339Z" fill="#E10500"/>
       <path d="M190.159 108.339H108.661V135.429H190.159V108.339Z" fill="#E10500"/>
+    </svg>
+  );
+}
+
+function XLogo({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
   );
 }
@@ -116,20 +139,38 @@ function BeatRing({ isPlaying }: { isPlaying: boolean }) {
 }
 
 export default function HomePage() {
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [upcoming, setUpcoming] = useState<Track[]>([]);
-  const [isDJNext, setIsDJNext] = useState(false);
-  const [songsUntilDJ, setSongsUntilDJ] = useState(3);
+  // Core state - all managed locally
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [songsPlayed, setSongsPlayed] = useState(0);
+  const [isDJ, setIsDJ] = useState(false);
+  const [voiceIndex, setVoiceIndex] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+
   const [currentBlock, setCurrentBlock] = useState<Block | null>(null);
   const [schedule, setSchedule] = useState<Block[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [progress, setProgress] = useState(0);
   const [isGeneratingDJ, setIsGeneratingDJ] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
   const [djName, setDjName] = useState("");
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Derived values
+  const currentTrack = isDJ ? null : PLAYLIST[currentIndex % PLAYLIST.length];
+  const upcoming = (() => {
+    if (!hasStarted) return PLAYLIST.slice(0, 3);
+    const list: Track[] = [];
+    let idx = currentIndex;
+    for (let i = 0; i < 3; i++) {
+      idx = (idx + 1) % PLAYLIST.length;
+      list.push(PLAYLIST[idx]);
+    }
+    return list;
+  })();
+  const isDJNext = songsPlayed >= 3 && !isDJ;
+  const songsUntilDJ = Math.max(0, 3 - songsPlayed);
 
   const fetchSchedule = useCallback(async () => {
     try {
@@ -142,29 +183,11 @@ export default function HomePage() {
     }
   }, []);
 
-  const fetchQueue = useCallback(async () => {
-    try {
-      const res = await fetch("/api/playlist");
-      const data = await res.json();
-      setCurrentTrack(data.current ? { ...data.current, isDJ: data.isPlayingDJ || false } : null);
-      setUpcoming(data.upcoming || []);
-      setIsDJNext(data.isDJNext || false);
-      setSongsUntilDJ(data.songsUntilDJ ?? 3);
-      setHasStarted(data.hasStarted);
-    } catch (e) {
-      console.error("Failed to fetch queue", e);
-    }
-  }, []);
-
   useEffect(() => {
     fetchSchedule();
-    fetchQueue();
-    const interval = setInterval(() => {
-      fetchSchedule();
-      fetchQueue();
-    }, 30000);
+    const interval = setInterval(fetchSchedule, 60000);
     return () => clearInterval(interval);
-  }, [fetchSchedule, fetchQueue]);
+  }, [fetchSchedule]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
@@ -193,111 +216,78 @@ export default function HomePage() {
     audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
   }, []);
 
-  const fetchAndPlayMusic = useCallback(async () => {
-    try {
-      const res = await fetch("/api/playlist");
-      const data = await res.json();
-      if (data.current) {
-        setCurrentTrack({ ...data.current, isDJ: false });
-        loadAndPlay(data.current.src);
-      }
-      setUpcoming(data.upcoming || []);
-      setIsDJNext(data.isDJNext || false);
-      setSongsUntilDJ(data.songsUntilDJ ?? 3);
-    } catch (e) {
-      console.error("Play music failed", e);
-    }
-  }, [loadAndPlay]);
+  const playNextMusic = useCallback(() => {
+    const nextIdx = (currentIndex + 1) % PLAYLIST.length;
+    setCurrentIndex(nextIdx);
+    setSongsPlayed((prev) => prev + 1);
+    setIsDJ(false);
+    loadAndPlay(PLAYLIST[nextIdx].src);
+  }, [currentIndex, loadAndPlay]);
 
   const handleTrackEnd = useCallback(async () => {
     setProgress(0);
     setIsPlaying(false);
 
-    if (currentTrack?.isDJ) {
-      try {
-        await fetch("/api/playlist", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "dj_complete" }),
-        });
-        await fetchAndPlayMusic();
-      } catch (e) {
-        console.error("DJ complete failed", e);
-      }
+    if (isDJ) {
+      // DJ just finished → play next music
+      const nextIdx = (currentIndex + 1) % PLAYLIST.length;
+      setCurrentIndex(nextIdx);
+      setSongsPlayed(1); // we played 1 song after DJ
+      setIsDJ(false);
+      loadAndPlay(PLAYLIST[nextIdx].src);
       return;
     }
 
-    try {
-      const res = await fetch("/api/playlist", { method: "POST" });
-      const data = await res.json();
-
-      if (data.isDJ) {
-        setIsGeneratingDJ(true);
-        try {
-          const djRes = await fetch("/api/dj", { method: "POST" });
-          const djData = await djRes.json();
-          if (djData.audioSrc) {
-            setDjName(djData.voice || "");
-            setCurrentTrack({
-              id: -1,
-              title: djData.voice || "Host",
-              src: djData.audioSrc,
-              duration: 20,
-              isDJ: true,
-            });
-            loadAndPlay(djData.audioSrc);
-          }
-        } catch (e) {
-          console.error("DJ generation failed", e);
-          await fetchAndPlayMusic();
-        } finally {
-          setIsGeneratingDJ(false);
+    // Music track ended
+    if (songsPlayed >= 3) {
+      // Generate DJ
+      setIsGeneratingDJ(true);
+      try {
+        const res = await fetch("/api/dj", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voiceIndex }),
+        });
+        const data = await res.json();
+        if (data.audioSrc) {
+          setVoiceIndex((prev) => prev + 1);
+          setDjName(data.voice || "");
+          setIsDJ(true);
+          loadAndPlay(data.audioSrc);
         }
-      } else if (data.track) {
-        setCurrentTrack({ ...data.track, isDJ: false });
-        loadAndPlay(data.track.src);
-        setUpcoming(data.upcoming || []);
-        setIsDJNext(data.isDJNext || false);
-        setSongsUntilDJ(data.songsUntilDJ ?? 3);
+      } catch (e) {
+        console.error("DJ generation failed", e);
+        playNextMusic();
+      } finally {
+        setIsGeneratingDJ(false);
       }
-    } catch (e) {
-      console.error("Track end handling failed", e);
+    } else {
+      playNextMusic();
     }
-  }, [currentTrack, loadAndPlay, fetchAndPlayMusic]);
+  }, [isDJ, currentIndex, songsPlayed, voiceIndex, loadAndPlay, playNextMusic]);
 
   const handleFirstStart = useCallback(async () => {
     setIsGeneratingDJ(true);
     try {
-      await fetch("/api/playlist", {
+      const res = await fetch("/api/dj", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start" }),
+        body: JSON.stringify({ type: "intro", voiceIndex }),
       });
-
-      const djRes = await fetch("/api/dj", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "intro" }),
-      });
-      const djData = await djRes.json();
-      if (djData.audioSrc) {
-        setDjName(djData.voice || "");
-        setCurrentTrack({
-          id: -2,
-          title: djData.voice || "Host",
-          src: djData.audioSrc,
-          duration: 20,
-          isDJ: true,
-        });
-        loadAndPlay(djData.audioSrc);
+      const data = await res.json();
+      if (data.audioSrc) {
+        setVoiceIndex((prev) => prev + 1);
+        setDjName(data.voice || "");
+        setIsDJ(true);
         setHasStarted(true);
+        loadAndPlay(data.audioSrc);
       }
     } catch (e) {
       console.error("Start failed", e);
     } finally {
       setIsGeneratingDJ(false);
     }
-  }, [loadAndPlay]);
+  }, [voiceIndex, loadAndPlay]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
@@ -307,7 +297,9 @@ export default function HomePage() {
     } else {
       if (!hasStarted) {
         handleFirstStart();
-      } else if (currentTrack?.src) {
+      } else if (isDJ && audioRef.current.src) {
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      } else if (currentTrack) {
         if (audioRef.current.src !== currentTrack.src) {
           loadAndPlay(currentTrack.src);
         } else {
@@ -315,14 +307,14 @@ export default function HomePage() {
         }
       }
     }
-  }, [isPlaying, hasStarted, currentTrack, handleFirstStart, loadAndPlay]);
+  }, [isPlaying, hasStarted, isDJ, currentTrack, handleFirstStart, loadAndPlay]);
 
-  const skipNext = useCallback(async () => {
+  const skipNext = useCallback(() => {
     if (!audioRef.current) return;
     audioRef.current.pause();
     setIsPlaying(false);
     setProgress(0);
-    await handleTrackEnd();
+    handleTrackEnd();
   }, [handleTrackEnd]);
 
   return (
@@ -348,7 +340,6 @@ export default function HomePage() {
         {/* Player Card */}
         <div className="bg-white rounded-2xl border border-[#e8e4df] shadow-sm p-6 sm:p-8 mb-5">
           <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-            {/* Visualizer */}
             <div className="shrink-0 relative">
               <BeatRing isPlaying={isPlaying} />
               <button
@@ -360,7 +351,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Info */}
             <div className="flex-1 text-center sm:text-left w-full">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-medium border border-amber-200 mb-3">
                 <Radio className="w-3 h-3" />
@@ -368,14 +358,12 @@ export default function HomePage() {
               </div>
 
               <h2 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] mb-1 leading-tight">
-                {currentTrack?.title || "Ready to Play"}
+                {isDJ ? djName || "Host" : currentTrack?.title || "Ready to Play"}
               </h2>
-              {currentTrack?.isDJ ? (
+              {isDJ ? (
                 <div className="flex items-center gap-1.5 justify-center sm:justify-start">
                   <Mic className="w-3.5 h-3.5 text-[#FF8205]" />
-                  <p className="text-sm text-[#FF8205] font-medium">
-                    {djName || "Host"} on the Mic · ~20 sec
-                  </p>
+                  <p className="text-sm text-[#FF8205] font-medium">On the Mic · ~20 sec</p>
                 </div>
               ) : currentTrack ? (
                 <p className="text-sm text-[#9a9590]">Now Playing</p>
@@ -431,11 +419,11 @@ export default function HomePage() {
           {/* Host Break Row */}
           {isDJNext && (
             <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF8205] to-[#FA500F] flex items-center justify-center shrink-0">
-                <Mic className="w-4 h-4 text-white" />
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF8205] to-[#FA500F] flex items-center justify-center shrink-0 text-white text-xs font-bold">
+                {HOSTS[voiceIndex % HOSTS.length]?.charAt(0)}
               </div>
               <div className="flex-1">
-                <div className="text-sm font-bold text-[#1a1a1a]">Camille & Hugo · Host Break</div>
+                <div className="text-sm font-bold text-[#1a1a1a]">{HOSTS[voiceIndex % HOSTS.length]} · Host Break</div>
                 <div className="text-xs text-[#9a9590]">~20 sec · Then back to music</div>
               </div>
               <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">NEXT</span>
@@ -444,25 +432,19 @@ export default function HomePage() {
 
           {/* Song Queue */}
           <div className="space-y-2">
-            {upcoming.length > 0 ? (
-              upcoming.map((track, i) => (
-                <div
-                  key={`${track.id}-${i}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[#faf8f5] border border-[#f0ece6]"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-white border border-[#e8e4df] flex items-center justify-center text-xs font-bold text-[#9a9590] shrink-0">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-[#1a1a1a] truncate">{track.title}</div>
-                  </div>
+            {upcoming.map((track, i) => (
+              <div
+                key={`${track.title}-${i}`}
+                className="flex items-center gap-3 p-3 rounded-xl bg-[#faf8f5] border border-[#f0ece6]"
+              >
+                <div className="w-8 h-8 rounded-lg bg-white border border-[#e8e4df] flex items-center justify-center text-xs font-bold text-[#9a9590] shrink-0">
+                  {i + 1}
                 </div>
-              ))
-            ) : (
-              <div className="text-sm text-[#9a9590] text-center py-6">
-                {!hasStarted ? "Hit play to start the station" : "Queue loading..."}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-[#1a1a1a] truncate">{track.title}</div>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
 
@@ -504,7 +486,9 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <span>Mistral Small · Voxtral TTS</span>
-            <a href="https://x.com/noctus91" target="_blank" rel="noopener noreferrer" className="text-[#FF8205] hover:underline font-medium">@noctus91</a>
+            <a href="https://x.com/noctus91" target="_blank" rel="noopener noreferrer" className="text-[#9a9590] hover:text-[#FF8205] transition-colors">
+              <XLogo className="w-4 h-4" />
+            </a>
           </div>
         </div>
       </footer>

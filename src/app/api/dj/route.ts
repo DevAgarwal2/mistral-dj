@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateChatCompletion, generateSpeech, VOICES } from "@/lib/mistral";
-import { getCurrentBlock, incrementVoiceIndex, createInitialState } from "@/lib/playlist";
-import type { RadioState } from "@/lib/playlist";
+import { getCurrentBlock } from "@/lib/playlist";
 import { join } from "path";
 import { mkdirSync, existsSync } from "fs";
 
@@ -12,17 +11,12 @@ const TMP_DIR = "/tmp/mistral-fm";
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    let state: RadioState = body.state || createInitialState();
     const isIntro = body.type === "intro";
+    const voiceIndex = body.voiceIndex || 0;
     const block = getCurrentBlock();
 
-    if (!state.playlist || state.playlist.length === 0) {
-      state = createInitialState();
-    }
-
-    const voiceId = VOICE_LIST[state.voiceIndex % VOICE_LIST.length];
-    const hostName = HOST_NAMES[state.voiceIndex % HOST_NAMES.length];
-    state = incrementVoiceIndex(state);
+    const voiceId = VOICE_LIST[voiceIndex % VOICE_LIST.length];
+    const hostName = HOST_NAMES[voiceIndex % HOST_NAMES.length];
 
     const prompt = isIntro
       ? `You are ${hostName}, a charismatic radio host launching MISTRAL-FM. Generate a punchy, exciting 40-45 word station intro (~20 seconds). Welcome listeners with energy, mention Mistral-powered radio. Use exclamation marks and natural enthusiasm. Never say "artificial intelligence" or "AI".`
@@ -49,7 +43,6 @@ export async function POST(request: Request) {
       audioSrc: `/api/audio?file=${segmentId}.mp3`,
       isIntro,
       voice: hostName,
-      state,
     });
   } catch (err: any) {
     console.error("DJ generation error:", err);
